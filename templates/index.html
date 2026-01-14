@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>University Admission Chatbot</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: "Segoe UI", Roboto, Arial, sans-serif;
+        }
+
+        body {
+            margin: 0;
+            background: #e5e7eb; /* solid background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .chat-container {
+            background: #ffffff;
+            width: 100%;
+            max-width: 420px;
+            height: 90vh;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: #1e3a8a;
+            color: #ffffff;
+            padding: 16px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 14px;
+            overflow-y: auto;
+            background: #f1f5f9;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message {
+            margin-bottom: 12px;
+            max-width: 85%;
+            padding: 10px 14px;
+            border-radius: 10px;
+            line-height: 1.4;
+            font-size: 14px;
+        }
+
+        .user {
+            background: #1e3a8a;
+            color: #ffffff;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .bot {
+            background: #ffffff;
+            color: #1f2937;
+            align-self: flex-start;
+            border: 1px solid #d1d5db;
+            border-bottom-left-radius: 4px;
+        }
+
+        .chat-input {
+            display: flex;
+            padding: 10px;
+            border-top: 1px solid #d1d5db;
+            background: #ffffff;
+        }
+
+        .chat-input input {
+            flex: 1;
+            padding: 12px;
+            font-size: 14px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            outline: none;
+        }
+
+        .chat-input button {
+            margin-left: 8px;
+            padding: 12px 16px;
+            background: #1e3a8a;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .chat-input button:hover {
+            background: #172554;
+        }
+
+        @media (min-width: 768px) {
+            .chat-container {
+                max-width: 600px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="chat-container">
+    <div class="chat-header">
+        🎓 University Admission Policy Bot
+    </div>
+
+    <div class="chat-messages" id="chatBox">
+        <div class="message bot">
+            Hello! Ask me anything about university admission policies.
+        </div>
+    </div>
+
+    <div class="chat-input">
+        <input type="text" id="userInput" placeholder="Type your question..." />
+        <button onclick="sendMessage()">Send</button>
+    </div>
+</div>
+
+<script>
+    const chatBox = document.getElementById("chatBox");
+    const userInput = document.getElementById("userInput");
+
+    function escapeHtml(unsafe) {
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function renderMarkdownToHtml(text) {
+        // Basic safe markdown: bold (**text**), italic (*text*), inline code (`code`), preserve line breaks
+        let t = escapeHtml(text);
+        t = t.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        t = t.replace(/\*(.+?)\*/g, '<em>$1</em>');
+        t = t.replace(/`(.+?)`/g, '<code>$1</code>');
+        return t.replace(/\n/g, '<br>');
+    }
+
+    function addMessage(text, sender) {
+        const msg = document.createElement("div");
+        msg.classList.add("message", sender);
+        msg.innerHTML = renderMarkdownToHtml(text);
+        chatBox.appendChild(msg);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        return msg;
+    }
+
+    async function sendMessage() {
+        const question = userInput.value.trim();
+        if (!question) return;
+
+        addMessage(question, "user");
+        userInput.value = "";
+
+        const botMsg = addMessage("Thinking...", "bot");
+
+        try {
+            const response = await fetch("/ask", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ question })
+            });
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let raw = "";
+            botMsg.innerHTML = "";
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                // accumulate raw text across chunks to allow regex matches across boundaries
+                const chunk = decoder.decode(value);
+                raw += chunk;
+                botMsg.innerHTML = renderMarkdownToHtml(raw);
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+
+        } catch {
+            botMsg.textContent = "Server connection error.";
+        }
+    }
+
+    userInput.addEventListener("keydown", e => {
+        if (e.key === "Enter") sendMessage();
+    });
+</script>
+
+</body>
+</html>
